@@ -188,3 +188,4 @@ def export_custom_to_json(df: pd.DataFrame, nets_text: str, name_to_id: Dict[str
         "nets": nets_list,
     }
     return json.dumps(data, indent=2)
+
