@@ -163,3 +163,4 @@ def plot_comparative_charts(agg_df: pd.DataFrame, output_dir: str) -> None:
 
 if __name__ == "__main__":
     run_comparative_benchmark_suite()
+

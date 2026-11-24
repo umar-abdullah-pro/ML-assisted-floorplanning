@@ -2,9 +2,13 @@
 Combines:
 1. Optimal Slack-Driven Block Shaping (SDS) [Yan & Chu, ISPD 2012]
 2. Q-Learning Step-Size Controller [Meng et al., CSF 2025]
+3. Custom Floorplan Input Studio (Table Editor, JSON/CSV Upload, Custom Netlist)
 """
 
 from __future__ import annotations
+import io
+import json
+import math
 import os
 import sys
 import time
@@ -21,6 +25,14 @@ from sds.basic_sds import BasicSDSSolver
 from sds.full_sds import FullSDSSolver
 from sds.optimality import OptimalityChecker
 from sds.visualizer import plot_floorplan, plot_convergence
+from sds.custom_input import (
+    DEFAULT_CUSTOM_BLOCKS,
+    DEFAULT_CUSTOM_NETS,
+    parse_blocks_from_dataframe,
+    parse_netlist_text,
+    parse_custom_json,
+    export_custom_to_json,
+)
 from benchmarks.figure2_example import build_figure2_benchmark
 from benchmarks.mcnc_benchmarks import build_mcnc_benchmark, MCNC_SPECS
 from benchmarks.synthetic_benchmarks import generate_hb_style_benchmark
@@ -49,24 +61,37 @@ st.markdown(
     """
 )
 
-# Sidebar
+# Initialize session state for custom floorplan
+if "custom_blocks_df" not in st.session_state:
+    st.session_state.custom_blocks_df = pd.DataFrame(DEFAULT_CUSTOM_BLOCKS)
+if "custom_nets_text" not in st.session_state:
+    st.session_state.custom_nets_text = DEFAULT_CUSTOM_NETS
+if "experiment_results" not in st.session_state:
+    st.session_state.experiment_results = None
+
+# Sidebar Setup
 st.sidebar.header("🔧 Benchmark & Design Setup")
 
 benchmark_choice = st.sidebar.selectbox(
     "Select Benchmark Circuit",
     [
-        "Figure 2 (ISPD 2012 Counterexample)",
+        "✨ Custom Floorplan (Build / Upload)",
         "MCNC: apte (9 blocks)",
         "MCNC: xerox (10 blocks)",
         "MCNC: hp (11 blocks)",
         "MCNC: ami33a (33 blocks)",
         "Synthetic Scalable Benchmark (HB-Style)",
+        "Figure 2 (ISPD 2012 Counterexample)",
     ],
-    index=1,
+    index=0,
 )
 
-# Custom params for synthetic benchmark
-if "Synthetic" in benchmark_choice:
+# Branch on benchmark selection
+if benchmark_choice == "✨ Custom Floorplan (Build / Upload)":
+    bench_name = "Custom_Floorplan"
+    is_custom = True
+elif "Synthetic" in benchmark_choice:
+    is_custom = False
     num_soft = st.sidebar.slider("Number of Soft Blocks", 5, 60, 20)
     num_hard = st.sidebar.slider("Number of Hard Macros", 2, 20, 6)
     seed = st.sidebar.number_input("Random Seed", value=42, step=1)
@@ -75,19 +100,162 @@ if "Synthetic" in benchmark_choice:
     default_h = default_w
     nets = [[i, (i % len(blocks)) + 1] for i in range(1, len(blocks))]
 elif "Figure 2" in benchmark_choice:
+    is_custom = False
     blocks, gh, gv, default_w = build_figure2_benchmark()
     bench_name = "Figure2_Example"
     default_h = 4.0
     nets = [[1, 2], [2, 3], [3, 4]]
 else:
     # MCNC
+    is_custom = False
     clean_name = benchmark_choice.split(":")[1].split("(")[0].strip()
     blocks, gh, gv, default_w = build_mcnc_benchmark(clean_name, target_experiment="table2", seed=42)
     bench_name = clean_name
     default_h = default_w * 1.15
     nets = [[i, (i % len(blocks)) + 1] for i in range(1, len(blocks))]
 
-# Outline Bounds
+
+# CUSTOM FLOORPLAN STUDIO (Shown when Custom is selected)
+if is_custom:
+    with st.expander("🛠️ Custom Floorplan Studio (Design, Edit & Connect Blocks)", expanded=True):
+        st.markdown(
+            """
+            Define your own blocks, fixed dimensions for hard macros, aspect ratio bounds for soft blocks,
+            and pin connectivity (netlist). You can edit directly in the table, upload a file, or paste JSON.
+            """
+        )
+
+        input_method = st.radio(
+            "Custom Input Mode",
+            ["Interactive Table Editor", "Upload JSON / CSV File", "Paste JSON Code"],
+            horizontal=True,
+        )
+
+        # Mode A: Interactive Table Editor
+        if input_method == "Interactive Table Editor":
+            st.markdown("**Editable Block Specifications:** *(Click '+' at the bottom of the table to add new blocks)*")
+
+            # Preset buttons
+            pcol1, pcol2, pcol3, _ = st.columns([1.5, 1.5, 1.2, 3])
+            with pcol1:
+                if st.button("🔄 Load 8-Block SoC Preset", use_container_width=True):
+                    st.session_state.custom_blocks_df = pd.DataFrame(DEFAULT_CUSTOM_BLOCKS)
+                    st.session_state.custom_nets_text = DEFAULT_CUSTOM_NETS
+                    st.rerun()
+            with pcol2:
+                if st.button("📐 Load 4-Block Fig 2 Preset", use_container_width=True):
+                    st.session_state.custom_blocks_df = pd.DataFrame([
+                        {"Name": "B1", "Type": "Soft", "Area": 4.0, "Fixed_Width": 0.0, "Fixed_Height": 0.0, "Min_AR": 0.25, "Max_AR": 4.0},
+                        {"Name": "B2", "Type": "Soft", "Area": 4.0, "Fixed_Width": 0.0, "Fixed_Height": 0.0, "Min_AR": 0.25, "Max_AR": 4.0},
+                        {"Name": "B3", "Type": "Soft", "Area": 4.0, "Fixed_Width": 0.0, "Fixed_Height": 0.0, "Min_AR": 0.25, "Max_AR": 4.0},
+                        {"Name": "B4", "Type": "Soft", "Area": 4.0, "Fixed_Width": 0.0, "Fixed_Height": 0.0, "Min_AR": 0.25, "Max_AR": 4.0},
+                    ])
+                    st.session_state.custom_nets_text = "B1, B2\nB2, B3\nB3, B4"
+                    st.rerun()
+            with pcol3:
+                if st.button("🗑️ Clear Table", use_container_width=True):
+                    st.session_state.custom_blocks_df = pd.DataFrame([
+                        {"Name": "Block1", "Type": "Soft", "Area": 100.0, "Fixed_Width": 0.0, "Fixed_Height": 0.0, "Min_AR": 0.33, "Max_AR": 3.0}
+                    ])
+                    st.session_state.custom_nets_text = ""
+                    st.rerun()
+
+            column_config = {
+                "Name": st.column_config.TextColumn("Block Name", required=True),
+                "Type": st.column_config.SelectboxColumn("Type", options=["Soft", "Hard"], required=True),
+                "Area": st.column_config.NumberColumn("Area (A)", min_value=1.0, max_value=100000.0, step=1.0, format="%.1f"),
+                "Fixed_Width": st.column_config.NumberColumn("Fixed Width (Hard only)", min_value=0.0, max_value=10000.0, step=0.5, format="%.2f"),
+                "Fixed_Height": st.column_config.NumberColumn("Fixed Height (Hard only)", min_value=0.0, max_value=10000.0, step=0.5, format="%.2f"),
+                "Min_AR": st.column_config.NumberColumn("Min Aspect Ratio (h/w)", min_value=0.1, max_value=5.0, step=0.05, format="%.2f"),
+                "Max_AR": st.column_config.NumberColumn("Max Aspect Ratio (h/w)", min_value=0.2, max_value=10.0, step=0.05, format="%.2f"),
+            }
+
+            edited_df = st.data_editor(
+                st.session_state.custom_blocks_df,
+                column_config=column_config,
+                num_rows="dynamic",
+                use_container_width=True,
+                key="custom_blocks_editor",
+            )
+            st.session_state.custom_blocks_df = edited_df
+
+        # Mode B: Upload File
+        elif input_method == "Upload JSON / CSV File":
+            uploaded_file = st.file_uploader("Upload Floorplan Specification (.json or .csv)", type=["json", "csv"])
+            if uploaded_file is not None:
+                try:
+                    if uploaded_file.name.endswith(".json"):
+                        content = uploaded_file.read().decode("utf-8")
+                        parsed_df, parsed_nets = parse_custom_json(content)
+                        st.session_state.custom_blocks_df = parsed_df
+                        st.session_state.custom_nets_text = parsed_nets
+                        st.success(f"Successfully loaded {len(parsed_df)} blocks from {uploaded_file.name}!")
+                    else:  # CSV
+                        parsed_df = pd.read_csv(uploaded_file)
+                        st.session_state.custom_blocks_df = parsed_df
+                        st.success(f"Successfully loaded {len(parsed_df)} blocks from {uploaded_file.name}!")
+                    st.dataframe(st.session_state.custom_blocks_df, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error parsing file: {e}")
+
+        # Mode C: Paste JSON Code
+        else:
+            json_sample = export_custom_to_json(
+                st.session_state.custom_blocks_df,
+                st.session_state.custom_nets_text,
+                {},
+            )
+            pasted_json = st.text_area("Paste JSON Floorplan Definition", value=json_sample, height=220)
+            if st.button("📥 Apply Pasted JSON"):
+                try:
+                    parsed_df, parsed_nets = parse_custom_json(pasted_json)
+                    st.session_state.custom_blocks_df = parsed_df
+                    st.session_state.custom_nets_text = parsed_nets
+                    st.success("JSON applied successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Invalid JSON: {e}")
+
+        # Netlist Input Section
+        st.markdown("**Netlist Connectivity (HPWL Wirelength Calculation):**")
+        st.caption("Enter netlist connections as comma-separated block names per line (e.g., `CPU_Core, SRAM_Cache`):")
+        custom_nets_str = st.text_area(
+            "Netlist Connections",
+            value=st.session_state.custom_nets_text,
+            height=110,
+            key="custom_nets_input_area",
+        )
+        st.session_state.custom_nets_text = custom_nets_str
+
+        # Parse and compute summary statistics
+        blocks, name_to_id, total_area = parse_blocks_from_dataframe(st.session_state.custom_blocks_df)
+        nets = parse_netlist_text(st.session_state.custom_nets_text, name_to_id)
+
+        # Suggested outline bounds
+        sug_w = math.ceil(math.sqrt(total_area * 1.15))
+        sug_h = sug_w
+        default_w = float(sug_w)
+        default_h = float(sug_h)
+
+        # Metrics banner and export buttons
+        stat_col1, stat_col2, stat_col3, stat_col4 = st.columns([1.5, 1.5, 1.8, 2.2])
+        with stat_col1:
+            st.metric("Total Active Area", f"{total_area:.1f}")
+        with stat_col2:
+            num_s = sum(1 for b in blocks.values() if not b.is_hard)
+            num_h = len(blocks) - num_s
+            st.metric("Block Count", f"{len(blocks)} ({num_s}S / {num_h}H)")
+        with stat_col3:
+            st.metric("Suggested Outline (15% ws)", f"{sug_w} × {sug_h}")
+        with stat_col4:
+            # Export buttons
+            json_export = export_custom_to_json(st.session_state.custom_blocks_df, st.session_state.custom_nets_text, name_to_id)
+            csv_export = st.session_state.custom_blocks_df.to_csv(index=False)
+            st.download_button("💾 Export JSON", data=json_export, file_name="custom_floorplan.json", mime="application/json")
+            st.download_button("📄 Export CSV", data=csv_export, file_name="custom_blocks.csv", mime="text/csv")
+
+
+# Sidebar: Outline Bounds
 st.sidebar.subheader("📐 Fixed-Outline Chip Constraints")
 outline_w = st.sidebar.number_input("Upper-Bound Width (W)", value=float(round(default_w, 2)), step=1.0)
 outline_h = st.sidebar.number_input("Target Height (H)", value=float(round(default_h, 2)), step=1.0)
@@ -110,10 +278,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 
-# Session State storage for persistent results
-if "experiment_results" not in st.session_state:
-    st.session_state.experiment_results = None
-
+# Run Optimization
 if run_button or st.session_state.experiment_results is None:
     with st.spinner(f"Running 4-way comparative evaluation on {bench_name}..."):
         t0 = time.perf_counter()
@@ -321,11 +486,16 @@ with tab5:
 
     if st.button("🔍 Run Full SDS Analysis on Circuit", type="secondary"):
         with st.spinner("Analyzing constraint graphs and slacks..."):
-            inspector_solver = BasicSDSSolver(blocks, gh, gv, upper_bound_width=outline_w)
+            # Construct default constraint graphs for the inspector if not already set
+            seq_init = list(range(1, len(blocks) + 1))
+            from sds.sequence_pair import sequence_pair_to_constraint_graphs
+            insp_gh, insp_gv = sequence_pair_to_constraint_graphs(seq_init, seq_init, len(blocks), apply_reduction=True)
+
+            inspector_solver = BasicSDSSolver(blocks, insp_gh, insp_gv, upper_bound_width=outline_w)
             inspector_solver.compute_slacks()
             subsets = inspector_solver.classify_subsets()
 
-            checker = OptimalityChecker(inspector_solver.blocks, gh, gv, upper_bound_width=outline_w)
+            checker = OptimalityChecker(inspector_solver.blocks, insp_gh, insp_gv, upper_bound_width=outline_w)
             report = checker.check(inspector_solver.x_ll, inspector_solver.y_bl, subsets)
 
             col_s1, col_s2, col_s3 = st.columns(3)

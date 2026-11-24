@@ -13,6 +13,14 @@ from .convex_solver import solve_floorplan_convex, ConvexSolverResult
 from .full_sds import FullSDSSolver, FullSDSResult
 from .visualizer import plot_floorplan, plot_convergence
 from .api import shape_floorplan, compute_hpwl
+from .custom_input import (
+    DEFAULT_CUSTOM_BLOCKS,
+    DEFAULT_CUSTOM_NETS,
+    parse_blocks_from_dataframe,
+    parse_netlist_text,
+    parse_custom_json,
+    export_custom_to_json,
+)
 
 __all__ = [
     "Block",
@@ -31,5 +39,11 @@ __all__ = [
     "plot_convergence",
     "shape_floorplan",
     "compute_hpwl",
+    "DEFAULT_CUSTOM_BLOCKS",
+    "DEFAULT_CUSTOM_NETS",
+    "parse_blocks_from_dataframe",
+    "parse_netlist_text",
+    "parse_custom_json",
+    "export_custom_to_json",
 ]
 

@@ -7,3 +7,4 @@ echo ========================================================
 echo Opening at http://localhost:8501 ...
 python -m streamlit run app.py
 pause
+
