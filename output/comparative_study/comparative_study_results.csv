@@ -1,0 +1,25 @@
+Circuit,Seed,Method,Legal,Height,Width,HPWL,Cost,Legal Steps,Time (s)
+APTE,42,"Baseline (Fixed Shapes, Fixed Step)",No,273.36,222.86,1402.4,6.4732,0/80,0.04
+APTE,42,SDS Shaping Only (Fixed Step),No,240.68,195.09,1113.38,3.1058,0/80,0.683
+APTE,42,Q-Learning Step Size Only (Fixed Shapes),No,306.72,217.53,1352.85,7.6961,0/80,0.026
+APTE,42,Proposed (Q-Learning + SDS Shaping),No,241.63,195.09,1067.95,3.0977,0/80,0.838
+APTE,123,"Baseline (Fixed Shapes, Fixed Step)",No,379.23,185.45,1656.57,10.2241,0/80,0.023
+APTE,123,SDS Shaping Only (Fixed Step),No,242.31,195.09,1257.13,3.3498,0/80,0.573
+APTE,123,Q-Learning Step Size Only (Fixed Shapes),No,356.07,206.38,1613.46,9.7182,0/80,0.022
+APTE,123,Proposed (Q-Learning + SDS Shaping),No,240.68,195.09,1081.53,3.0688,0/80,0.387
+XEROX,42,"Baseline (Fixed Shapes, Fixed Step)",No,219.25,128.09,961.06,3.2253,0/80,0.019
+XEROX,42,SDS Shaping Only (Fixed Step),Yes,130.14,173.32,731.81,2.0853,81/80,0.63
+XEROX,42,Q-Learning Step Size Only (Fixed Shapes),Yes,179.5,168.12,1038.6,2.7099,15/80,0.023
+XEROX,42,Proposed (Q-Learning + SDS Shaping),Yes,129.0,173.32,792.42,2.1593,81/80,0.651
+XEROX,123,"Baseline (Fixed Shapes, Fixed Step)",No,231.34,125.46,896.83,3.7731,0/80,0.024
+XEROX,123,SDS Shaping Only (Fixed Step),Yes,118.06,173.32,754.62,2.0571,78/80,0.488
+XEROX,123,Q-Learning Step Size Only (Fixed Shapes),No,225.33,145.81,1365.69,4.1285,0/80,0.022
+XEROX,123,Proposed (Q-Learning + SDS Shaping),Yes,117.01,173.32,821.14,2.1393,81/80,0.891
+HP,42,"Baseline (Fixed Shapes, Fixed Step)",No,184.83,79.5,772.01,12.7447,0/80,0.041
+HP,42,SDS Shaping Only (Fixed Step),No,107.03,83.95,714.81,4.1221,0/80,0.498
+HP,42,Q-Learning Step Size Only (Fixed Shapes),No,147.24,84.14,737.13,8.5962,0/80,0.026
+HP,42,Proposed (Q-Learning + SDS Shaping),No,107.46,83.95,673.02,4.0557,0/80,0.517
+HP,123,"Baseline (Fixed Shapes, Fixed Step)",No,156.04,92.36,805.56,10.7706,0/80,0.02
+HP,123,SDS Shaping Only (Fixed Step),No,108.19,83.95,508.97,3.6911,0/80,0.565
+HP,123,Q-Learning Step Size Only (Fixed Shapes),No,174.52,66.78,642.05,11.1915,0/80,0.026
+HP,123,Proposed (Q-Learning + SDS Shaping),No,108.35,83.95,651.57,4.0948,0/80,0.804
