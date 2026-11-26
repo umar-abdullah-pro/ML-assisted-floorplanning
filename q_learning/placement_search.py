@@ -38,6 +38,9 @@ class OptimizerConfig:
     use_full_sds: bool = False  # True for Full SDS, False for fast Basic SDS
     temperature_init: float = 10.0  # Simulated annealing acceptance
     temperature_decay: float = 0.96
+    q_learning_rate: float = 0.15
+    q_discount_factor: float = 0.90
+    q_epsilon_init: float = 0.35
     seed: int = 42
 
 
@@ -229,7 +232,16 @@ class FixedOutlinePlacementOptimizer:
         best_blocks = {i: b.clone() for i, b in curr_blocks.items()}
 
         # Q-controller initialization
-        q_controller = QLearningController(seed=self.config.seed) if use_q_learning else None
+        q_controller = (
+            QLearningController(
+                learning_rate=self.config.q_learning_rate,
+                discount_factor=self.config.q_discount_factor,
+                epsilon_init=self.config.q_epsilon_init,
+                seed=self.config.seed,
+            )
+            if use_q_learning
+            else None
+        )
         prev_cost = curr_cost
         was_legal = curr_legal
 

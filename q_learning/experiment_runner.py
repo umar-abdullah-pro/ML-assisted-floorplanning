@@ -33,6 +33,9 @@ def compare_all_methods(
     max_iterations: int = 100,
     seed: int = 42,
     verbose: bool = False,
+    learning_rate: float = 0.15,
+    discount_factor: float = 0.90,
+    epsilon_init: float = 0.35,
 ) -> BenchmarkExperimentResult:
     """Run all 4 comparative modes on a given benchmark:
     1. Baseline (Fixed Shapes, Fixed Step)
@@ -45,6 +48,9 @@ def compare_all_methods(
         outline_height=outline_height,
         max_iterations=max_iterations,
         sds_inner_iterations=120,
+        q_learning_rate=learning_rate,
+        q_discount_factor=discount_factor,
+        q_epsilon_init=epsilon_init,
         seed=seed,
     )
 
